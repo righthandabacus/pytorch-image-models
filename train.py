@@ -262,6 +262,8 @@ group.add_argument('--decay-rate', '--dr', type=float, default=0.1, metavar='RAT
 
 # Augmentation & regularization parameters
 group = parser.add_argument_group('Augmentation and regularization parameters')
+group.add_argument('--color-mode', choices=['rgb', 'hsv', 'hsl', 'lab', 'yuv', 'ycbcr'], default='rgb', metavar='MODE',
+                   help='Color mode to convert images to before feeding to model. Requires --input-img-mode leave empty.')
 group.add_argument('--no-aug', action='store_true', default=False,
                    help='Disable all training augmentation, override other train aug args')
 group.add_argument('--train-crop-mode', type=str, default=None,
@@ -748,6 +750,7 @@ def main():
         use_prefetcher=args.prefetcher,
         use_multi_epochs_loader=args.use_multi_epochs_loader,
         worker_seeding=args.worker_seeding,
+        color_mode=args.color_mode,
     )
 
     loader_eval = None
@@ -771,6 +774,7 @@ def main():
             img_dtype=model_dtype or torch.float32,
             device=device,
             use_prefetcher=args.prefetcher,
+            color_mode=args.color_mode,
         )
 
     # setup loss function

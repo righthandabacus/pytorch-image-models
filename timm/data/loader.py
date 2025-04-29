@@ -233,6 +233,7 @@ def create_loader(
         persistent_workers: bool = True,
         worker_seeding: str = 'all',
         tf_preprocessing: bool = False,
+        color_mode: str = 'rgb',
 ):
     """
 
@@ -276,6 +277,7 @@ def create_loader(
         persistent_workers: Enable persistent worker processes.
         worker_seeding: Control worker random seeding at init.
         tf_preprocessing: Use TF 1.0 inference preprocessing for testing model ports.
+        color_mode: Set to RGB, HSL, HSV, YUV, or YCbCr
 
     Returns:
         DataLoader
@@ -311,6 +313,7 @@ def create_loader(
         tf_preprocessing=tf_preprocessing,
         use_prefetcher=use_prefetcher,
         separate=num_aug_splits > 0,
+        color_mode=color_mode,
     )
 
     if isinstance(dataset, IterableImageDataset):

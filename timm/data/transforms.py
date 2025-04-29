@@ -18,6 +18,7 @@ import numpy as np
 __all__ = [
     "ToNumpy", "ToTensor", "str_to_interp_mode", "str_to_pil_interp", "interp_mode_to_str",
     "RandomResizedCropAndInterpolation", "CenterCropOrPad", "center_crop_or_pad", "crop_or_pad",
+    "ColorMode", "StatsPrinter",
     "RandomCropOrPad", "RandomPad", "ResizeKeepRatio", "TrimBorder", "MaybeToTensor", "MaybePILToTensor"
 ]
 
@@ -58,7 +59,7 @@ class MaybeToTensor(transforms.ToTensor):
         """
         if isinstance(pic, torch.Tensor):
             return pic
-        return F.to_tensor(pic)
+        return F.to_tensor(pic)   # convert from [0, 255] to [0, 1]
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
@@ -581,3 +582,94 @@ class TrimBorder(torch.nn.Module):
         height = max(0, h - 2 * self.border_size)
         width = max(0, w - 2 * self.border_size)
         return F.crop(img, top, left, height, width)
+
+
+class ColorMode(torch.nn.Module):
+    """Change color mode from RGB to something else
+    If the image is torch Tensor, it is expected
+    to have [..., C, H, W] shape, where ... means an arbitrary number of leading dimensions.
+
+    Args:
+        color_mode (str): Either HSL, HSV, LAB, YUV, or YCbCr. Case insensitive
+    """
+
+    def __init__(
+            self,
+            mode: str,
+    ):
+        super().__init__()
+        self.mode = str(mode).lower()
+        assert mode in ["hsl", "hsv", "lab", "yuv", "ycbcr"]
+
+    def forward(self, img):
+        """
+        Args:
+            img (Tensor): Image in RGB, value range [0, 1]
+
+        Returns:
+            Tensor: Image convert to other color mode, value range [0, 1]
+        """
+        R = img[..., 0, :, :]
+        G = img[..., 1, :, :]
+        B = img[..., 2, :, :]
+        if self.mode in ["hsv", "hsl"]:
+            V = img.max(axis=-3).values   # max = value
+            m = img.min(axis=-3).values
+            delta = V - m    # = chroma = max - min
+            S = torch.where(V == 0, torch.tensor(0), delta / V)
+            H = torch.where(V == R, (G-B)/delta, torch.where(V == G, (B-R)/delta + 2, (R-G)/delta + 4))
+            H = ((H * 60) / 360) % 1.0  # H range [0, 1] instead of [0, 360]
+            if self.mode == "hsv":
+                img = torch.stack([H, S, V], dim=-3)
+            else:
+                img = torch.stack([H, S, delta/2], dim=-3)
+            return img
+        elif self.mode == "lab":
+            # non-linear transform of RGB
+            R_ = torch.where(R > 0.04045, ((R + 0.055) / 1.055) ** 2.4, R / 12.92)
+            G_ = torch.where(G > 0.04045, ((G + 0.055) / 1.055) ** 2.4, G / 12.92)
+            B_ = torch.where(B > 0.04045, ((B + 0.055) / 1.055) ** 2.4, B / 12.92)
+            # XYZ in range [0, 1]
+            X = (R_ * 0.412453 + G_ * 0.357580 + B_ * 0.180423) / 0.95047
+            Y = R_ * 0.212671 + G_ * 0.715160 + B_ * 0.072169
+            Z = (R_ * 0.019334 + G_ * 0.119193 + B_ * 0.950227) / 1.08883
+            X_ = torch.where(X > 0.008856, X ** (1/3), 7.787 * X + 16/116)
+            Y_ = torch.where(Y > 0.008856, Y ** (1/3), 7.787 * Y + 16/116)
+            Z_ = torch.where(Z > 0.008856, Z ** (1/3), 7.787 * Z + 16/116)
+            # L in range [0, 100], a in range [-86.183, 98.231], b in range [-107.8573, 94.4781]
+            L = 116 * Y_ - 16
+            a = 500 * (X_ - Y_)
+            b = 200 * (Y_ - Z_)
+            # stack and scale to [0, 1]
+            img = torch.stack([L/100, (a+86.183)/184.4161, (b+107.8573)/202.3354], dim=-3)
+            return img
+        elif self.mode == "yuv":
+            # U and V unbiased, will be in range[-0.5, 0.5]
+            Y = R * 0.299 + G * 0.587 + B * 0.114
+            U = R * -0.147 - G * 0.289 + B * 0.436
+            V = R * 0.615 - G * 0.515 - B * 0.100
+            img = torch.stack([Y, (U/0.872)+0.5, (V/1.230)+0.5], dim=-3)
+            return img
+        elif self.mode == "ycbcr":
+            # Cb and Cr unbiased, will be in range[-0.5, 0.5]
+            Y = R * 0.299 + G * 0.587 + B * 0.114
+            Cb = R * -0.168736 - G * 0.331264 + B * 0.5
+            Cr = R * 0.5 - G * 0.418688 - B * 0.081312
+            img = torch.stack([Y, Cb+0.5, Cr+0.5], dim=-3)
+            return img
+        else:
+            raise ValueError(f"Unsupported color mode: {self.mode}")
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(model={self.mode})"
+
+
+class StatsPrinter:
+    def __init__(self, prefix=""):
+        self.prefix = prefix
+    def __call__(self, img):
+        x = np.array(img)
+        print(f"{self.prefix} type={x.dtype} min={x.min()} max={x.max()} mean={x.mean()} std={x.std()}")
+        return img
+    def __repr__(self):
+        return f"StatsPrinter(prefix={self.prefix})"
