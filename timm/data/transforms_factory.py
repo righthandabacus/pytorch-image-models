@@ -51,7 +51,7 @@ def transforms_noaug_train(
         # prefetcher and collate will handle tensor conversion and norm
         tfl += [ToNumpy()]
         if color_mode.lower() != 'rgb':
-            tfl += [ColorMode(color_mode)]
+            tfl += [ColorMode(color_mode, use_numpy=True)]
     elif not normalize:
         # when normalize disabled, converted to tensor without scaling, keep original dtype
         tfl += [MaybePILToTensor()]
@@ -228,7 +228,7 @@ def transforms_imagenet_train(
         # prefetcher and collate will handle tensor conversion and norm
         final_tfl += [ToNumpy()]
         if color_mode.lower() != 'rgb':
-            final_tfl += [ColorMode(color_mode)]
+            final_tfl += [ColorMode(color_mode, use_numpy=True)]
     elif not normalize:
         # when normalize disable, converted to tensor without scaling, keeps original dtype
         final_tfl += [MaybePILToTensor()]
@@ -336,7 +336,7 @@ def transforms_imagenet_eval(
         # prefetcher and collate will handle tensor conversion and norm
         tfl += [ToNumpy()]
         if color_mode.lower() != 'rgb':
-            tfl += [ColorMode(color_mode)]
+            tfl += [ColorMode(color_mode, use_numpy=True)]
     elif not normalize:
         # when normalize disabled, converted to tensor without scaling, keeps original dtype
         tfl += [MaybePILToTensor()]
