@@ -6,6 +6,7 @@ Hacked together by / Copyright 2020 Ross Wightman
 """
 
 import glob
+import json
 import logging
 import operator
 import os
@@ -62,6 +63,11 @@ class CheckpointSaver:
         self.max_history = max_history
         self.unwrap_fn = unwrap_fn
         assert self.max_history >= 1
+
+        # load history if exists
+        if os.path.exists(os.path.join(self.checkpoint_dir, "checkpoint_history.json")):
+            with open(os.path.join(self.checkpoint_dir, "checkpoint_history.json")) as fp:
+                self.checkpoint_files = [tuple(x) for x in json.load(fp)]
 
     def _replace(self, src, dst):
         if self.can_hardlink:
@@ -142,6 +148,10 @@ class CheckpointSaver:
                 key=lambda x: x[1],
                 reverse=not self.decreasing  # sort in descending order if a lower metric is not better
             )
+
+            # save the checkpoint history to help resume
+            with open(os.path.join(self.checkpoint_dir, "checkpoint_history.json"), "w") as fp:
+                json.dump(self.checkpoint_files, fp, indent=4)
 
             checkpoints_str = "Current checkpoints:\n"
             for c in self.checkpoint_files:
