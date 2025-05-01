@@ -802,7 +802,7 @@ def main():
                 pos_weight=args.bce_pos_weight,
             )
         else:
-            train_loss_fn = LabelSmoothingCrossEntropy(smoothing=args.smoothing)
+            train_loss_fn = nn.CrossEntropyLoss(label_smoothing=args.smoothing)
     else:
         train_loss_fn = nn.CrossEntropyLoss()
     train_loss_fn = train_loss_fn.to(device=device)
