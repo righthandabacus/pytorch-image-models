@@ -241,6 +241,8 @@ group.add_argument('--min-lr', type=float, default=0, metavar='LR',
                    help='lower lr bound for cyclic schedulers that hit 0 (default: 0)')
 group.add_argument('--epochs', type=int, default=300, metavar='N',
                    help='number of epochs to train (default: 300)')
+group.add_argument('--end-epoch', default=None, type=int, metavar='N',
+                   help='epoch number to interrupt training (useful to change recipes in different stages)')
 group.add_argument('--epoch-repeats', type=float, default=0., metavar='N',
                    help='epoch repeat multiplier (number of times to repeat dataset epoch per train epoch).')
 group.add_argument('--start-epoch', default=None, type=int, metavar='N',
@@ -884,6 +886,9 @@ def main():
     results = []
     try:
         for epoch in range(start_epoch, num_epochs):
+            if args.end_epoch is not None and epoch >= args.end_epoch:
+                _logger.info(f'Interruptted training at epoch {epoch}')
+                break
             if hasattr(dataset_train, 'set_epoch'):
                 dataset_train.set_epoch(epoch)
             elif args.distributed and hasattr(loader_train.sampler, 'set_epoch'):
