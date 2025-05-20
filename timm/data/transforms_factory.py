@@ -12,6 +12,7 @@ from torchvision import transforms
 from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, DEFAULT_CROP_PCT
 from timm.data.auto_augment import rand_augment_transform, augment_and_mix_transform, auto_augment_transform
 from timm.data.transforms import str_to_interp_mode, str_to_pil_interp, RandomResizedCropAndInterpolation, \
+    ColorMode, StatsPrinter, \
     ResizeKeepRatio, CenterCropOrPad, RandomCropOrPad, TrimBorder, ToNumpy, MaybeToTensor, MaybePILToTensor
 from timm.data.random_erasing import RandomErasing
 
@@ -23,6 +24,7 @@ def transforms_noaug_train(
         std: Tuple[float, ...] = IMAGENET_DEFAULT_STD,
         use_prefetcher: bool = False,
         normalize: bool = True,
+        color_mode: str = 'rgb',
 ):
     """ No-augmentation image transforms for training.
 
@@ -33,6 +35,7 @@ def transforms_noaug_train(
         std: Image normalization standard deviation.
         use_prefetcher: Prefetcher enabled. Do not convert image to tensor or normalize.
         normalize: Normalization tensor output w/ provided mean/std (if prefetcher not used).
+        color_mode: Set to RGB, HSL, HSV, YUV, or YCbCr
 
     Returns:
 
@@ -47,12 +50,18 @@ def transforms_noaug_train(
     if use_prefetcher:
         # prefetcher and collate will handle tensor conversion and norm
         tfl += [ToNumpy()]
+        if color_mode.lower() != 'rgb':
+            tfl += [ColorMode(color_mode, use_numpy=True)]
     elif not normalize:
         # when normalize disabled, converted to tensor without scaling, keep original dtype
         tfl += [MaybePILToTensor()]
+        if color_mode.lower() != 'rgb':
+            tfl += [ColorMode(color_mode)]
     else:
+        tfl += [MaybeToTensor()]
+        if color_mode.lower() != 'rgb':
+            tfl += [ColorMode(color_mode)]
         tfl += [
-            MaybeToTensor(),
             transforms.Normalize(
                 mean=torch.tensor(mean),
                 std=torch.tensor(std)
@@ -84,6 +93,7 @@ def transforms_imagenet_train(
         use_prefetcher: bool = False,
         normalize: bool = True,
         separate: bool = False,
+        color_mode: str = 'rgb',
 ):
     """ ImageNet-oriented image transforms for training.
 
@@ -111,6 +121,7 @@ def transforms_imagenet_train(
         use_prefetcher: Prefetcher enabled. Do not convert image to tensor or normalize.
         normalize: Normalize tensor output w/ provided mean/std (if prefetcher not used).
         separate: Output transforms in 3-stage tuple.
+        color_mode: Set to RGB, HSL, HSV, YUV, or YCbCr
 
     Returns:
         If separate==True, the transforms are returned as a tuple of 3 separate transforms
@@ -216,12 +227,18 @@ def transforms_imagenet_train(
     if use_prefetcher:
         # prefetcher and collate will handle tensor conversion and norm
         final_tfl += [ToNumpy()]
+        if color_mode.lower() != 'rgb':
+            final_tfl += [ColorMode(color_mode, use_numpy=True)]
     elif not normalize:
         # when normalize disable, converted to tensor without scaling, keeps original dtype
         final_tfl += [MaybePILToTensor()]
+        if color_mode.lower() != 'rgb':
+            final_tfl += [ColorMode(color_mode)]
     else:
+        final_tfl += [MaybeToTensor()]
+        if color_mode.lower() != 'rgb':
+            final_tfl += [ColorMode(color_mode)]
         final_tfl += [
-            MaybeToTensor(),
             transforms.Normalize(
                 mean=torch.tensor(mean),
                 std=torch.tensor(std),
@@ -254,6 +271,7 @@ def transforms_imagenet_eval(
         std: Tuple[float, ...] = IMAGENET_DEFAULT_STD,
         use_prefetcher: bool = False,
         normalize: bool = True,
+        color_mode: str = 'rgb',
 ):
     """ ImageNet-oriented image transform for evaluation and inference.
 
@@ -267,6 +285,7 @@ def transforms_imagenet_eval(
         std: Image normalization standard deviation.
         use_prefetcher: Prefetcher enabled. Do not convert image to tensor or normalize.
         normalize: Normalize tensor output w/ provided mean/std (if prefetcher not used).
+        color_mode: Set to RGB, HSL, HSV, YUV, or YCbCr
 
     Returns:
         Composed transform pipeline
@@ -316,12 +335,18 @@ def transforms_imagenet_eval(
     if use_prefetcher:
         # prefetcher and collate will handle tensor conversion and norm
         tfl += [ToNumpy()]
+        if color_mode.lower() != 'rgb':
+            tfl += [ColorMode(color_mode, use_numpy=True)]
     elif not normalize:
         # when normalize disabled, converted to tensor without scaling, keeps original dtype
         tfl += [MaybePILToTensor()]
+        if color_mode.lower() != 'rgb':
+            tfl += [ColorMode(color_mode)]
     else:
+        tfl += [MaybeToTensor()]
+        if color_mode.lower() != 'rgb':
+            tfl += [ColorMode(color_mode)]
         tfl += [
-            MaybeToTensor(),
             transforms.Normalize(
                 mean=torch.tensor(mean),
                 std=torch.tensor(std),
@@ -359,6 +384,7 @@ def create_transform(
         use_prefetcher: bool = False,
         normalize: bool = True,
         separate: bool = False,
+        color_mode: str = 'rgb',
 ):
     """
 
@@ -391,6 +417,7 @@ def create_transform(
         use_prefetcher: Pre-fetcher enabled. Do not convert image to tensor or normalize.
         normalize: Normalization tensor output w/ provided mean/std (if prefetcher not used).
         separate: Output transforms in 3-stage tuple.
+        color_mode: Set to RGB, HSL, HSV, YUV, or YCbCr
 
     Returns:
         Composed transforms or tuple thereof
@@ -418,6 +445,7 @@ def create_transform(
                 std=std,
                 use_prefetcher=use_prefetcher,
                 normalize=normalize,
+                color_mode=color_mode,
             )
         elif is_training:
             transform = transforms_imagenet_train(
@@ -442,6 +470,7 @@ def create_transform(
                 use_prefetcher=use_prefetcher,
                 normalize=normalize,
                 separate=separate,
+                color_mode=color_mode,
             )
         else:
             assert not separate, "Separate transforms not supported for validation preprocessing"
@@ -455,6 +484,7 @@ def create_transform(
                 crop_border_pixels=crop_border_pixels,
                 use_prefetcher=use_prefetcher,
                 normalize=normalize,
+                color_mode=color_mode,
             )
 
     return transform
